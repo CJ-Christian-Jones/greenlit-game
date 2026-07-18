@@ -430,18 +430,21 @@ async function loadPageData() {
 
 // showModal() can be called from anywhere to re-open the token modal.
 function showModal() {
-  const backdrop = document.getElementById('apiModalBackdrop');
-  const skipBtn  = document.getElementById('apiModalSkip');
+  const backdrop   = document.getElementById('apiModalBackdrop');
+  const skipBtn    = document.getElementById('apiModalSkip');
+  const input      = document.getElementById('apiTokenInput');
+  const savedToken = getTmdbToken();
 
-  skipBtn.hidden = !getTmdbToken();
+  skipBtn.hidden = !savedToken;
+
+  // Prefill with the current saved token so the user can see/replace it
+  if (input) input.value = savedToken;
+
   backdrop.removeAttribute('aria-hidden');
   backdrop.style.display = '';
   backdrop.classList.remove('api-modal-backdrop--hidden');
 
-  setTimeout(() => {
-    const input = document.getElementById('apiTokenInput');
-    if (input) input.focus();
-  }, 100);
+  setTimeout(() => { if (input) input.focus(); }, 100);
 }
 
 function initApiKeyModal() {
@@ -458,7 +461,6 @@ function initApiKeyModal() {
   if (existingToken) {
     backdrop.setAttribute('aria-hidden', 'true');
     backdrop.style.display = 'none';
-    return;
   }
 
   toggle.addEventListener('click', () => {
