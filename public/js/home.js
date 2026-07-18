@@ -522,20 +522,152 @@ function initApiKeyModal() {
 
 
 // ============================================================
-// 11. Bootstrap
+// 11. Profile
+// ============================================================
+
+const PROFILE_KEY = 'GREENLIT_PROFILE';
+const AVATAR_COLORS = [
+  '#9BE564', '#D9FF57', '#57C8FF', '#FF8C57', '#C457FF',
+  '#FF5792', '#57FFD4', '#FFD157', '#FFFFFF', '#A5AA9F',
+];
+
+function getProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {};
+  } catch { return {}; }
+}
+
+function saveProfile(data) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+}
+
+function applyProfile(profile) {
+  const name   = profile.name  || 'Producer';
+  const color  = profile.color || AVATAR_COLORS[0];
+  const letter = name.trim()[0]?.toUpperCase() || 'P';
+
+  // Header avatar button
+  const headerAvatar = document.getElementById('profileAvatar');
+  if (headerAvatar) {
+    headerAvatar.textContent    = letter;
+    headerAvatar.style.background = color;
+  }
+
+  // Dropdown avatar
+  const dropAvatar = document.getElementById('dropdownAvatar');
+  if (dropAvatar) {
+    dropAvatar.textContent       = letter;
+    dropAvatar.style.background  = color;
+  }
+
+  // Dropdown name
+  const nameEl = document.getElementById('profileDisplayName');
+  if (nameEl) nameEl.textContent = name;
+}
+
+function initProfile() {
+  const profile    = getProfile();
+  applyProfile(profile);
+
+  const btn        = document.getElementById('profileBtn');
+  const dropdown   = document.getElementById('profileDropdown');
+  const editBtn    = document.getElementById('profileEditBtn');
+  const editForm   = document.getElementById('profileEditForm');
+  const nameInput  = document.getElementById('profileNameInput');
+  const colorRow   = document.getElementById('profileColorRow');
+  const cancelBtn  = document.getElementById('profileCancelBtn');
+
+  // Build color swatches
+  let selectedColor = profile.color || AVATAR_COLORS[0];
+  AVATAR_COLORS.forEach((c) => {
+    const swatch = document.createElement('button');
+    swatch.type  = 'button';
+    swatch.className = 'profile-color-swatch' + (c === selectedColor ? ' profile-color-swatch--active' : '');
+    swatch.style.background = c;
+    swatch.setAttribute('aria-label', `Avatar color ${c}`);
+    swatch.addEventListener('click', () => {
+      selectedColor = c;
+      colorRow.querySelectorAll('.profile-color-swatch').forEach((s) => {
+        s.classList.toggle('profile-color-swatch--active', s === swatch);
+      });
+    });
+    colorRow.appendChild(swatch);
+  });
+
+  // Toggle dropdown
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !dropdown.hidden;
+    dropdown.hidden = isOpen;
+    btn.setAttribute('aria-expanded', String(!isOpen));
+    if (!isOpen) {
+      editForm.hidden = true;
+      nameInput.value = '';
+    }
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!dropdown.hidden && !document.getElementById('profileMenu').contains(e.target)) {
+      dropdown.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      editForm.hidden = true;
+    }
+  });
+
+  // Show inline edit form
+  editBtn.addEventListener('click', () => {
+    const current = getProfile();
+    nameInput.value = current.name || '';
+    selectedColor   = current.color || AVATAR_COLORS[0];
+    colorRow.querySelectorAll('.profile-color-swatch').forEach((s) => {
+      s.classList.toggle('profile-color-swatch--active', s.style.background === selectedColor || s.style.backgroundColor === selectedColor);
+    });
+    editForm.hidden = false;
+    nameInput.focus();
+  });
+
+  cancelBtn.addEventListener('click', () => { editForm.hidden = true; });
+
+  // Save profile
+  editForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = nameInput.value.trim() || 'Producer';
+    const updated = { name, color: selectedColor };
+    saveProfile(updated);
+    applyProfile(updated);
+    editForm.hidden = true;
+  });
+
+  // Dropdown: Update Token
+  document.getElementById('dropdownUpdateToken')?.addEventListener('click', () => {
+    dropdown.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+    showModal();
+  });
+
+  // Dropdown: Clear All Data
+  document.getElementById('dropdownClearData')?.addEventListener('click', () => {
+    if (confirm('Clear all saved data? This removes your profile and TMDB token.')) {
+      localStorage.clear();
+      location.reload();
+    }
+  });
+}
+
+
+// ============================================================
+// 12. Bootstrap
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
   initFooterYear();
   initHeroCarousel();
+  initProfile();
 
   const token = getTmdbToken();
   initApiKeyModal();
 
-  // Header "Update Token" button
-  document.getElementById('updateTokenBtn')?.addEventListener('click', () => showModal());
-
-  // If a token is already stored, load data immediately.
   if (token) {
     loadPageData();
   }
