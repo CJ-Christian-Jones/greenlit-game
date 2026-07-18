@@ -453,7 +453,13 @@ function initApiKeyModal() {
   const skipBtn  = document.getElementById('apiModalSkip');
 
   const existingToken = getTmdbToken();
-  if (existingToken) skipBtn.hidden = false;
+
+  // If a token is already saved, skip the modal entirely.
+  if (existingToken) {
+    backdrop.setAttribute('aria-hidden', 'true');
+    backdrop.style.display = 'none';
+    return;
+  }
 
   toggle.addEventListener('click', () => {
     const isPassword = input.type === 'password';
