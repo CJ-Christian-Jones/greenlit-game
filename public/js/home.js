@@ -406,11 +406,14 @@ async function loadPageData() {
   } catch (err) {
     console.error('Failed to load TMDB data:', err.message);
 
+    const is401 = err.message.includes('401');
+    const msg   = is401
+      ? 'Token rejected (401 Unauthorized). You need the <strong>Read Access Token</strong> — the long <code>eyJ…</code> value from <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener" style="color:var(--color-green)">themoviedb.org/settings/api</a>, not the short API Key.'
+      : 'Could not load movies. Check your TMDB token and try again.';
+
     const container = document.getElementById('recommendationContainer');
     container.innerHTML = `
-      <p style="padding:32px 32px 16px; color:var(--color-muted); font-size:14px;">
-        Could not load movies. Check that your TMDB token is valid and try again.
-      </p>
+      <p style="padding:32px 32px 16px; color:var(--color-muted); font-size:14px; line-height:1.6;">${msg}</p>
       <div style="padding:0 32px 32px;">
         <button
           id="retryTokenBtn"
@@ -503,6 +506,8 @@ function initApiKeyModal() {
   });
 
   function dismissModal() {
+    // Move focus out before hiding so aria-hidden doesn't trap focused elements
+    document.activeElement?.blur();
     backdrop.classList.add('api-modal-backdrop--hidden');
     setTimeout(() => {
       backdrop.setAttribute('aria-hidden', 'true');
