@@ -660,6 +660,19 @@ function initProfile() {
 // 12. Bootstrap
 // ============================================================
 
+// ============================================================
+// 13. "Take Over" button navigation
+// ============================================================
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-movie-id]');
+  if (!btn) return;
+  if (btn.textContent.trim() !== 'Take Over') return;
+  const movieId = btn.dataset.movieId;
+  if (movieId) window.location.href = `direction.html?id=${movieId}`;
+});
+
+
 document.addEventListener('DOMContentLoaded', () => {
   initFooterYear();
   initHeroCarousel();
