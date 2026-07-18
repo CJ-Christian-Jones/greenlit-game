@@ -171,7 +171,23 @@ async function tmdbFetch(pathname, query = {}) {
     },
   });
 
-  if (!res.ok) throw new Error(`TMDB ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+  let errorDetails = "";
+
+  try {
+    const errorData = await res.json();
+    errorDetails =
+      errorData.status_message ||
+      errorData.message ||
+      "";
+  } catch {
+    // TMDB did not return readable JSON.
+  }
+
+  throw new Error(
+    `TMDB ${res.status}: ${errorDetails || res.statusText || "Request failed"}`
+  );
+}
   return res.json();
 }
 
@@ -296,7 +312,12 @@ function renderReleaseSection(movie) {
     : 'unavailable';
 
   // Defaults: original year + 4, same month
-  const defaultYear  = origYear + 4;
+  const currentYear = new Date().getFullYear();
+
+  const defaultYear = Math.min(
+    Math.max(origYear + 4, currentYear),
+    currentYear + 10
+  );
   const defaultMonth = origMonth;
 
   state.releaseYear  = defaultYear;
@@ -307,9 +328,21 @@ function renderReleaseSection(movie) {
   if (origInfoEl) origInfoEl.textContent = `Original release: ${origLabel}`;
 
   // Year <select>
-  const select      = document.getElementById('releaseYear');
-  const currentYear = new Date().getFullYear();
-  for (let y = 1970; y <= currentYear + 10; y++) {
+  const select = document.getElementById("releaseYear");
+
+  if (!select) {
+    throw new Error(
+      'Missing HTML element: <select id="releaseYear">'
+    );
+  }
+
+select.innerHTML = "";
+
+  select.innerHTML = "";
+  const earliestYear = currentYear;
+  const latestYear = currentYear + 10;
+
+  for (let y = earliestYear; y <= latestYear; y++) {
     const opt = document.createElement('option');
     opt.value       = y;
     opt.textContent = y;
@@ -323,7 +356,16 @@ function renderReleaseSection(movie) {
   });
 
   // Month pills
-  const pillsEl = document.getElementById('monthPills');
+  const pillsEl = document.getElementById("monthPills");
+
+  if (!pillsEl) {
+    throw new Error(
+      'Missing HTML element: id="monthPills"'
+    );
+  }
+
+  pillsEl.innerHTML = "";
+
   MONTH_SHORT.forEach((name, i) => {
     const monthNum = i + 1;
     const btn = document.createElement('button');
@@ -373,6 +415,11 @@ function renderGenreSection(movie) {
   state.origSecondaryGenreId   = origSecond?.id   ?? null;
   state.origSecondaryGenreName = origSecond?.name ?? null;
 
+  // Start with the original secondary genre selected.
+// The player may keep it or choose a different one.
+state.newSecondaryGenreId = origSecond?.id ?? null;
+state.newSecondaryGenreName = origSecond?.name ?? null;
+
   // Primary (locked)
   const primaryEl = document.getElementById('genrePrimary');
   if (primaryEl && primary) {
@@ -397,33 +444,34 @@ function renderGenreSection(movie) {
   }
 
   // Genre pill grid
-  const pillsEl = document.getElementById('genrePills');
-  TMDB_GENRES.forEach(genre => {
+  const pillsEl = document.getElementById("genrePills");
+  pillsEl.innerHTML = "";
+
+  TMDB_GENRES.forEach((genre) => {
     const isPrimary = genre.id === primary?.id;
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'genre-pill' + (isPrimary ? ' genre-pill--disabled' : '');
+    const isSelected = genre.id === state.newSecondaryGenreId;
+
+    btn.className =
+      "genre-pill" +
+      (isPrimary ? " genre-pill--disabled" : "") +
+      (isSelected ? " genre-pill--active" : "");
     btn.textContent = genre.name;
     btn.dataset.genreId   = genre.id;
     btn.dataset.genreName = genre.name;
     btn.disabled = isPrimary;
     if (isPrimary) btn.title = 'Cannot choose the primary genre as secondary';
-    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute("aria-pressed", String(isSelected));
 
     btn.addEventListener('click', () => {
       if (isPrimary) return;
 
-      // Deselect if already chosen
-      if (state.newSecondaryGenreId === genre.id) {
-        state.newSecondaryGenreId   = null;
-        state.newSecondaryGenreName = null;
-        btn.classList.remove('genre-pill--active');
-        btn.setAttribute('aria-pressed', 'false');
-        updateGenreCompatHint(null, null);
-        updateSummary();
-        updateContinueBtn();
-        return;
-      }
+    // A secondary genre is required.
+    // Clicking the currently selected genre does nothing.
+    if (state.newSecondaryGenreId === genre.id) {
+      return;
+    }
 
       // Select new
       state.newSecondaryGenreId   = genre.id;
@@ -550,6 +598,24 @@ function renderCastSection(movie) {
   const listEl    = document.getElementById('castList');
   const expandBtn = document.getElementById('castExpandBtn');
   const expandEl  = document.getElementById('castExpanded');
+
+  if (!listEl) {
+  throw new Error(
+    'Missing HTML element: id="castList"'
+  );
+}
+
+if (!expandBtn) {
+  throw new Error(
+    'Missing HTML element: id="castExpandBtn"'
+  );
+}
+
+if (!expandEl) {
+  throw new Error(
+    'Missing HTML element: id="castExpanded"'
+  );
+}
 
   top5.forEach((actor, idx) => {
     listEl.appendChild(buildCastCard(actor, idx));
@@ -714,52 +780,146 @@ function updateContinueBtn() {
 }
 
 function initContinueBtn() {
-  const btn = document.getElementById('continueBtn');
+  const btn = document.getElementById("continueBtn");
+
   if (!btn) return;
-  btn.addEventListener('click', () => {
-    if (!movieData) return;
+
+  btn.addEventListener("click", () => {
+    // Stop if the movie has not loaded yet.
+    if (!movieData) {
+      console.error("Cannot save project because movieData is missing.");
+      return;
+    }
+
+    // Find the original movie's director in the crew list.
+    const director = (movieData.credits?.crew || []).find(
+      (crewMember) => crewMember.job === "Director"
+    );
+
+    // Build one project object containing both:
+    // 1. The original movie information
+    // 2. The player's new production choices
     const project = {
-      sourceMovieTmdbId:           movieData.id,
-      title:                       movieData.title,
-      posterUrl:                   imgUrl(movieData.poster_path,   'w500')  || '',
-      backdropUrl:                 imgUrl(movieData.backdrop_path, 'w1280') || '',
-      originalReleaseYear:         movieData.release_date ? Number(movieData.release_date.slice(0, 4)) : null,
-      originalReleaseMonth:        movieData.release_date ? Number(movieData.release_date.slice(5, 7)) : null,
-      newReleaseYear:              state.releaseYear,
-      newReleaseMonth:             state.releaseMonth,
-      primaryGenreId:              state.primaryGenreId,
-      primaryGenreName:            state.primaryGenreName,
-      originalSecondaryGenreId:    state.origSecondaryGenreId,
-      originalSecondaryGenreName:  state.origSecondaryGenreName,
-      newSecondaryGenreId:         state.newSecondaryGenreId,
-      newSecondaryGenreName:       state.newSecondaryGenreName,
-      creativeDirection:           state.creativeDirection,
-      castDecisions:               state.castDecisions.slice(),
+      sourceMovieTmdbId: movieData.id,
+
+      originalMovie: {
+        tmdbId: movieData.id,
+        title: movieData.title,
+        overview: movieData.overview || "",
+        releaseDate: movieData.release_date || null,
+        runtime: movieData.runtime || null,
+        budget: movieData.budget || null,
+        revenue: movieData.revenue || null,
+        rating: movieData.vote_average || null,
+        voteCount: movieData.vote_count || null,
+        popularity: movieData.popularity || null,
+        posterPath: movieData.poster_path || null,
+        backdropPath: movieData.backdrop_path || null,
+        genres: movieData.genres || [],
+
+        director: director
+          ? {
+              tmdbId: director.id,
+              name: director.name,
+            }
+          : null,
+      },
+
+      // These older top-level fields can stay for now because
+      // other parts of your game may already expect them.
+      title: movieData.title,
+
+      posterUrl:
+        imgUrl(movieData.poster_path, "w500") || "",
+
+      backdropUrl:
+        imgUrl(movieData.backdrop_path, "w1280") || "",
+
+      originalReleaseYear: movieData.release_date
+        ? Number(movieData.release_date.slice(0, 4))
+        : null,
+
+      originalReleaseMonth: movieData.release_date
+        ? Number(movieData.release_date.slice(5, 7))
+        : null,
+
+      // Player choices
+      newReleaseYear: state.releaseYear,
+      newReleaseMonth: state.releaseMonth,
+
+      primaryGenreId: state.primaryGenreId,
+      primaryGenreName: state.primaryGenreName,
+
+      originalSecondaryGenreId:
+        state.origSecondaryGenreId,
+
+      originalSecondaryGenreName:
+        state.origSecondaryGenreName,
+
+      newSecondaryGenreId:
+        state.newSecondaryGenreId,
+
+      newSecondaryGenreName:
+        state.newSecondaryGenreName,
+
+      creativeDirection:
+        state.creativeDirection,
+
+      castDecisions:
+        state.castDecisions.slice(),
     };
-    localStorage.setItem(PROJECT_KEY, JSON.stringify(project));
-    window.location.href = 'casting.html';
+
+    // Save the complete project in browser storage.
+    localStorage.setItem(
+      PROJECT_KEY,
+      JSON.stringify(project)
+    );
+
+    // Temporary confirmation until casting.html exists.
+    alert("Project saved successfully.");
+
+    // Restore this after the casting page has been created:
+    // window.location.href = "casting.html";
   });
 }
 
-
 // ============================================================
-// 12. Profile avatar (static — no dropdown on this page)
+// 12. Profile avatar
 // ============================================================
 
 function initProfileAvatar() {
   try {
-    const profile = JSON.parse(localStorage.getItem('GREENLIT_PROFILE')) || {};
-    const name    = profile.name  || 'Producer';
-    const color   = profile.color || '#9BE564';
-    const letter  = name.trim()[0]?.toUpperCase() || 'P';
-    const el      = document.getElementById('dirProfileAvatar');
-    if (el) {
-      el.textContent         = letter;
-      el.parentElement.style.background = color;
-    }
-  } catch (_) { /* ignore */ }
-}
+    const profile =
+      JSON.parse(
+        localStorage.getItem("GREENLIT_PROFILE")
+      ) || {};
 
+    const name =
+      profile.name || "Producer";
+
+    const color =
+      profile.color || "#9BE564";
+
+    const letter =
+      name.trim()[0]?.toUpperCase() || "P";
+
+    const el =
+      document.getElementById("dirProfileAvatar");
+
+    if (el) {
+      el.textContent = letter;
+
+      if (el.parentElement) {
+        el.parentElement.style.background = color;
+      }
+    }
+  } catch (error) {
+    console.warn(
+      "Could not load the profile avatar.",
+      error
+    );
+  }
+}
 
 // ============================================================
 // 13. Page state helpers
@@ -825,6 +985,8 @@ async function init() {
   showLoading();
 
   async function loadMovie() {
+    showLoading();
+    
     try {
       movieData = await tmdbFetch(`/movie/${movieId}`, {
         append_to_response: 'credits',

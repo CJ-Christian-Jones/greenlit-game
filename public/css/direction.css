@@ -16,11 +16,19 @@
    12. Responsive
 ============================================================ */
 
+/* The JavaScript uses the HTML "hidden" attribute to switch
+   between loading, error, and page-content states.
+
+   Some classes below use display:flex, which can override the
+   browser's default hidden behavior unless we enforce it here. */
+[hidden] {
+  display: none !important;
+}
 
 /* ------------------------------------------------------------
    1. Page scaffold & header override
 ------------------------------------------------------------ */
-.direction-page body {
+body.direction-page {
   overflow-x: hidden;
 }
 
@@ -915,7 +923,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  min-height: calc(100vh - var(--header-height));
   padding: 40px 24px;
 }
 
