@@ -9,8 +9,10 @@
    6. Search section
    7. Recommendation rows
    8. Movie cards
-   9. Footer
-   10. Responsive
+   9. TMDB API modal
+   10. Skeleton loading
+   11. Footer
+   12. Responsive
 ============================================================ */
 
 
@@ -950,7 +952,70 @@ button {
 
 
 /* ------------------------------------------------------------
-   10. Footer
+   10. Skeleton loading
+------------------------------------------------------------ */
+
+@keyframes skeleton-shimmer {
+  from { background-position: -600px 0; }
+  to   { background-position:  600px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-card)   25%,
+    #2d3429             50%,
+    var(--color-card)   75%
+  );
+  background-size: 600px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.skeleton--title {
+  height: 52px;
+  width: 55%;
+  margin-bottom: 16px;
+}
+
+.skeleton--meta {
+  height: 18px;
+  width: 38%;
+  margin-bottom: 20px;
+}
+
+.skeleton--desc {
+  height: 14px;
+  width: 70%;
+  margin-bottom: 8px;
+}
+
+.skeleton--heading {
+  height: 26px;
+  width: 200px;
+}
+
+.skeleton--card {
+  height: 270px;
+  width: 180px;
+  border-radius: 8px;
+  flex: 0 0 180px;
+}
+
+/* Hero loading slide — dark background while fetching */
+.hero-slide--loading {
+  background: var(--color-panel);
+  display: flex;
+  align-items: flex-end;
+}
+
+.hero-slide--loading .hero-slide__content {
+  padding-bottom: 64px;
+}
+
+
+/* ------------------------------------------------------------
+   11. Footer
 ------------------------------------------------------------ */
 .site-footer {
   padding: 32px;
@@ -975,7 +1040,7 @@ button {
 
 
 /* ------------------------------------------------------------
-   11. Responsive
+   12. Responsive
 ------------------------------------------------------------ */
 
 /* Tablet (601px – 1024px) */

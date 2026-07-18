@@ -2,135 +2,155 @@
  * home.js
  *
  * Drives the GreenLit home page:
+ *   - TMDB API key modal (saves token to localStorage)
+ *   - Live TMDB data fetch (popular / discover / now-playing)
  *   - Hero carousel (auto-advance, prev/next, dot indicators)
- *   - Recommendation rows (rendered from data arrays)
- *   - Footer year
- *
- * HOW TO RUN:
- *   Open public/index.html in a browser (local server or file://).
- *   Set TMDB_ACCESS_TOKEN as needed for live data; hard-coded objects
- *   are used for the first-version static build.
+ *   - Recommendation rows built from live API data
+ *   - All movies guaranteed to have a real poster_path before display
+ *   - onerror fallback hides any card whose image still fails to load
  */
 
 'use strict';
 
 // ============================================================
-// 1. Hard-coded hero movies
-//    Each entry represents one carousel slide.
-//    Replace or extend this array when pulling live TMDB data.
+// 1. Constants
 // ============================================================
 
-const HERO_MOVIES = [
-  {
-    id: 49047,
-    title: 'Gravity',
-    tagline: 'Take over the production.',
-    year: 2013,
-    runtime: 91,
-    rating: 7.7,
-    genres: ['Science Fiction', 'Thriller'],
-    overview:
-      'Dr. Ryan Stone, a brilliant medical engineer on her first shuttle mission, is accompanied by veteran astronaut Matt Kowalski. But on a seemingly routine spacewalk, disaster strikes.',
-    backdropUrl: 'https://image.tmdb.org/t/p/w1280/y3bPtXMjgK5etDe3ELMPW3M5P6G.jpg',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/fkM6n29q3s1KJwxJEGHFzZz5bQN.jpg',
-  },
-  {
-    id: 157336,
-    title: 'Interstellar',
-    tagline: 'Mankind was born on Earth. It was never meant to die here.',
-    year: 2014,
-    runtime: 169,
-    rating: 8.4,
-    genres: ['Adventure', 'Drama', 'Science Fiction'],
-    overview:
-      'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
-    backdropUrl: 'https://image.tmdb.org/t/p/w1280/xJHokMbljvjADYdit5fK5VQsXEG.jpg',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
-  },
-  {
-    id: 550,
-    title: 'Fight Club',
-    tagline: 'Mischief. Mayhem. Soap.',
-    year: 1999,
-    runtime: 139,
-    rating: 8.4,
-    genres: ['Drama', 'Thriller'],
-    overview:
-      'An insomniac office worker and a devil-may-care soap maker form an underground fight club that evolves into something much, much more.',
-    backdropUrl: 'https://image.tmdb.org/t/p/w1280/87hTDiay2N2qWyX4Ds7ybXi9h8I.jpg',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg',
-  },
-  {
-    id: 238,
-    title: 'The Godfather',
-    tagline: 'An offer you can\'t refuse.',
-    year: 1972,
-    runtime: 175,
-    rating: 8.7,
-    genres: ['Drama', 'Crime'],
-    overview:
-      'Spanning the years 1945 to 1955, a chronicle of the fictional Italian-American Corleone crime family.',
-    backdropUrl: 'https://image.tmdb.org/t/p/w1280/tmU7GeKVybMWFButWEGl2M4GeiP.jpg',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsLlegkKDBAngela.jpg',
-  },
-  {
-    id: 603,
-    title: 'The Matrix',
-    tagline: 'Free your mind.',
-    year: 1999,
-    runtime: 136,
-    rating: 8.2,
-    genres: ['Action', 'Science Fiction'],
-    overview:
-      'Set in the 22nd century, The Matrix tells the story of a computer hacker who joins a group of underground insurgents fighting against the powerful computers who now rule the earth.',
-    backdropUrl: 'https://image.tmdb.org/t/p/w1280/fNG7i7RqMErkcqhohV2a6cV1Ehy.jpg',
-    posterUrl: 'https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg',
-  },
-];
+const STORAGE_KEY      = 'TMDB_ACCESS_TOKEN';
+const TMDB_API_BASE    = 'https://api.themoviedb.org/3';
+const TMDB_IMAGE_BASE  = 'https://image.tmdb.org/t/p';
+const POSTER_SIZE      = 'w500';
+const BACKDROP_SIZE    = 'w1280';
+const ADVANCE_MS       = 7000;
+
+// Number of movies to show per recommendation row
+const ROW_MOVIE_COUNT  = 10;
+// Number of slides in the hero carousel
+const HERO_SLIDE_COUNT = 5;
 
 
 // ============================================================
-// 2. Hard-coded recommendation rows
-//    Each category has a title and an array of movie objects.
-//    Adding a new row later = adding one more entry here.
+// 2. Token helpers
 // ============================================================
 
-const RECOMMENDATION_ROWS = [
-  {
-    title: 'New Releases',
-    movies: [
-      { id: 746036, title: 'The Fall Guy',   year: 2024, rating: 7.0, genres: ['Action', 'Comedy'],          posterUrl: 'https://image.tmdb.org/t/p/w500/tSz1qsmSJon0rqjHBxXZmrotuse.jpg' },
-      { id: 653346, title: 'Kingdom of the Planet of the Apes', year: 2024, rating: 7.1, genres: ['Action', 'Science Fiction'], posterUrl: 'https://image.tmdb.org/t/p/w500/gKkl37BQuKTanygYQG1pyYgLVgf.jpg' },
-      { id: 519182, title: 'Despicable Me 4', year: 2024, rating: 7.2, genres: ['Animation', 'Comedy'],       posterUrl: 'https://image.tmdb.org/t/p/w500/wWba3TaojhK7NdyCyUoAuu5Vnd4.jpg' },
-      { id: 718821, title: 'Twisters',       year: 2024, rating: 7.0, genres: ['Action', 'Drama'],           posterUrl: 'https://image.tmdb.org/t/p/w500/pjnD08FlMAIXsfOLKQbIt9byM6W.jpg' },
-      { id: 573435, title: 'Bad Boys: Ride or Die', year: 2024, rating: 7.3, genres: ['Action', 'Comedy'],   posterUrl: 'https://image.tmdb.org/t/p/w500/nP6RliHjxsz4irTKsxe8uRbLE4X.jpg' },
-    ],
-  },
-  {
-    title: 'Classics',
-    movies: [
-      { id: 238,    title: 'The Godfather',    year: 1972, rating: 8.7, genres: ['Drama', 'Crime'],              posterUrl: 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsLlegkKDBAngela.jpg' },
-      { id: 278,    title: 'The Shawshank Redemption', year: 1994, rating: 8.7, genres: ['Drama', 'Crime'],      posterUrl: 'https://image.tmdb.org/t/p/w500/lyQBXzOQSuE59IsHyhrp0qIiPAz.jpg' },
-      { id: 240,    title: 'The Godfather Part II', year: 1974, rating: 8.6, genres: ['Drama', 'Crime'],          posterUrl: 'https://image.tmdb.org/t/p/w500/hek3koDUyRQk7FIhPXsa6mT2Zc3.jpg' },
-      { id: 424,    title: "Schindler's List", year: 1993, rating: 8.6, genres: ['History', 'Drama', 'War'],      posterUrl: 'https://image.tmdb.org/t/p/w500/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg' },
-      { id: 389,    title: '12 Angry Men',     year: 1957, rating: 8.5, genres: ['Drama'],                       posterUrl: 'https://image.tmdb.org/t/p/w500/ppd84D2i9W8jXmsyInGyihiSyqz.jpg' },
-    ],
-  },
-  {
-    title: 'Seasonal Picks',
-    movies: [
-      { id: 11324,  title: "Edward Scissorhands", year: 1990, rating: 7.9, genres: ['Fantasy', 'Drama', 'Romance'], posterUrl: 'https://image.tmdb.org/t/p/w500/1RFIbuW9Z3ZFrLSikBh42acBUxd.jpg' },
-      { id: 8844,   title: 'Beetlejuice',          year: 1988, rating: 7.5, genres: ['Comedy', 'Fantasy'],           posterUrl: 'https://image.tmdb.org/t/p/w500/nnZeNkBJBBBNuBaECzqbLhVJNOL.jpg' },
-      { id: 637,    title: 'La La Land',            year: 2016, rating: 7.9, genres: ['Drama', 'Romance', 'Music'],   posterUrl: 'https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg' },
-      { id: 14836,  title: 'The Holiday',           year: 2006, rating: 7.2, genres: ['Romance', 'Comedy'],           posterUrl: 'https://image.tmdb.org/t/p/w500/7gFo1PEbe1CoSgNTnjCGdZbw0zP.jpg' },
-      { id: 9479,   title: 'Home Alone',            year: 1990, rating: 7.4, genres: ['Family', 'Comedy'],            posterUrl: 'https://image.tmdb.org/t/p/w500/onTSipZ8R3bliBdKfPtsDaxA2wT.jpg' },
-    ],
-  },
-];
+export function getTmdbToken() {
+  return localStorage.getItem(STORAGE_KEY) || '';
+}
+
+function buildImageUrl(path, size) {
+  if (!path) return null;
+  return `${TMDB_IMAGE_BASE}/${size}${path}`;
+}
 
 
 // ============================================================
-// 3. Hero Carousel
+// 3. TMDB API client (browser-native fetch)
+// ============================================================
+
+async function tmdbFetch(pathname, query = {}) {
+  const token = getTmdbToken();
+  const url   = new URL(`${TMDB_API_BASE}${pathname}`);
+
+  Object.entries(query).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') {
+      url.searchParams.set(k, String(v));
+    }
+  });
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`TMDB ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+// Normalise a raw TMDB movie object into our display shape.
+// Returns null if the movie has no poster — callers must filter those out.
+function normalizeMovie(raw) {
+  if (!raw.poster_path) return null;
+
+  return {
+    id:         raw.id,
+    title:      raw.title || raw.original_title || 'Untitled',
+    tagline:    raw.tagline || null,
+    year:       raw.release_date ? Number(raw.release_date.slice(0, 4)) : null,
+    runtime:    raw.runtime || null,
+    rating:     raw.vote_average ?? 0,
+    genres:     (raw.genres || []).map((g) => g.name),
+    overview:   raw.overview || '',
+    posterUrl:  buildImageUrl(raw.poster_path, POSTER_SIZE),
+    backdropUrl: buildImageUrl(raw.backdrop_path, BACKDROP_SIZE),
+  };
+}
+
+
+// ============================================================
+// 4. Data fetching
+// ============================================================
+
+async function fetchHeroMovies() {
+  // Use the top popular movies; each is fetched with full details
+  // so we get runtime, tagline, and genres.
+  const data   = await tmdbFetch('/movie/popular', { language: 'en-US', page: 1 });
+  const movies = (data.results || []).filter((m) => m.poster_path && m.backdrop_path);
+
+  // Fetch full details in parallel for the first HERO_SLIDE_COUNT movies
+  const detailRequests = movies.slice(0, HERO_SLIDE_COUNT * 2).map((m) =>
+    tmdbFetch(`/movie/${m.id}`, { language: 'en-US' }).catch(() => null)
+  );
+
+  const details = (await Promise.all(detailRequests))
+    .filter(Boolean)
+    .map(normalizeMovie)
+    .filter(Boolean)
+    .slice(0, HERO_SLIDE_COUNT);
+
+  return details;
+}
+
+async function fetchRowMovies(endpoint, query = {}) {
+  const data   = await tmdbFetch(endpoint, { language: 'en-US', page: 1, ...query });
+  const movies = (data.results || [])
+    .map(normalizeMovie)
+    .filter(Boolean)          // removes any without poster_path
+    .slice(0, ROW_MOVIE_COUNT);
+
+  return movies;
+}
+
+async function fetchAllRows() {
+  const [newReleases, classics, topRated] = await Promise.all([
+    // New Releases — movies currently in theatres
+    fetchRowMovies('/movie/now_playing').catch(() => []),
+
+    // Classics — highly rated movies released before 1995
+    fetchRowMovies('/discover/movie', {
+      sort_by:                     'vote_average.desc',
+      'vote_count.gte':            1000,
+      'primary_release_date.lte':  '1994-12-31',
+    }).catch(() => []),
+
+    // Popular Right Now — overall trending (week)
+    fetchRowMovies('/trending/movie/week').catch(() => []),
+  ]);
+
+  return [
+    { title: 'Now Playing',       movies: newReleases },
+    { title: 'Classics',          movies: classics    },
+    { title: 'Popular Right Now', movies: topRated    },
+  ].filter((row) => row.movies.length > 0);
+}
+
+
+// ============================================================
+// 5. Hero Carousel
 // ============================================================
 
 const heroTrack = document.getElementById('heroTrack');
@@ -139,14 +159,18 @@ const heroPrev  = document.getElementById('heroPrev');
 const heroNext  = document.getElementById('heroNext');
 const heroEl    = document.querySelector('.hero-carousel');
 
-let currentSlide   = 0;
+let currentSlide = 0;
+let totalSlides  = 0;
 let autoAdvance;
-const ADVANCE_MS   = 7000;
 
 function buildSlide(movie) {
   const slide = document.createElement('div');
   slide.className = 'hero-slide';
-  slide.style.backgroundImage = `url('${movie.backdropUrl}')`;
+  slide.style.backgroundImage = `url('${movie.backdropUrl || movie.posterUrl}')`;
+
+  const ratingText = movie.rating ? movie.rating.toFixed(1) : 'N/A';
+  const runtimeText = movie.runtime ? `${movie.runtime} min` : '';
+  const genreText  = (movie.genres || []).slice(0, 2).join(', ');
 
   slide.innerHTML = `
     <div class="hero-slide__overlay-side"   aria-hidden="true"></div>
@@ -154,18 +178,15 @@ function buildSlide(movie) {
     <div class="hero-slide__content">
       <h1 class="hero-slide__title">${movie.title}</h1>
       <p class="hero-slide__meta">
-        <span>${movie.year}</span>
-        <span class="hero-slide__meta-dot" aria-hidden="true"></span>
-        <span class="hero-slide__meta-rating">&#9733; ${movie.rating.toFixed(1)}</span>
-        <span class="hero-slide__meta-dot" aria-hidden="true"></span>
-        <span>${movie.runtime} min</span>
-        <span class="hero-slide__meta-dot" aria-hidden="true"></span>
-        <span>${movie.genres.slice(0, 2).join(', ')}</span>
+        ${movie.year ? `<span>${movie.year}</span><span class="hero-slide__meta-dot" aria-hidden="true"></span>` : ''}
+        <span class="hero-slide__meta-rating">&#9733; ${ratingText}</span>
+        ${runtimeText ? `<span class="hero-slide__meta-dot" aria-hidden="true"></span><span>${runtimeText}</span>` : ''}
+        ${genreText   ? `<span class="hero-slide__meta-dot" aria-hidden="true"></span><span>${genreText}</span>`   : ''}
       </p>
       <p class="hero-slide__description">${movie.overview}</p>
       <div class="hero-slide__buttons">
-        <button class="btn-primary" type="button">Take Over</button>
-        <button class="btn-secondary" type="button">More Info</button>
+        <button class="btn-primary"   type="button" data-movie-id="${movie.id}">Take Over</button>
+        <button class="btn-secondary" type="button" data-movie-id="${movie.id}">More Info</button>
       </div>
     </div>
   `;
@@ -173,58 +194,56 @@ function buildSlide(movie) {
   return slide;
 }
 
-function buildDot(index) {
+function buildDot(index, total) {
   const li  = document.createElement('li');
   const btn = document.createElement('button');
-  btn.className  = 'hero-carousel__dot';
+  btn.className = 'hero-carousel__dot';
   btn.setAttribute('aria-label', `Go to slide ${index + 1}`);
-  btn.addEventListener('click', () => goToSlide(index));
+  btn.addEventListener('click', () => { goToSlide(index); resetTimer(); });
   li.appendChild(btn);
   return li;
 }
 
 function goToSlide(index) {
-  currentSlide = (index + HERO_MOVIES.length) % HERO_MOVIES.length;
+  currentSlide = ((index % totalSlides) + totalSlides) % totalSlides;
   heroTrack.style.transform = `translateX(-${currentSlide * 100}%)`;
 
-  // Update dots
   heroDots.querySelectorAll('.hero-carousel__dot').forEach((dot, i) => {
     dot.classList.toggle('hero-carousel__dot--active', i === currentSlide);
     dot.setAttribute('aria-current', i === currentSlide ? 'true' : 'false');
   });
 }
 
-function initHeroCarousel() {
-  HERO_MOVIES.forEach((movie, index) => {
+function populateHeroCarousel(movies) {
+  // Clear any existing content (e.g. loading placeholder)
+  heroTrack.innerHTML = '';
+  heroDots.innerHTML  = '';
+
+  totalSlides = movies.length;
+
+  movies.forEach((movie, index) => {
     heroTrack.appendChild(buildSlide(movie));
-    heroDots.appendChild(buildDot(index));
+    heroDots.appendChild(buildDot(index, totalSlides));
   });
 
   goToSlide(0);
+}
 
-  heroPrev.addEventListener('click', () => {
-    goToSlide(currentSlide - 1);
-    resetTimer();
-  });
+function initHeroCarousel() {
+  heroPrev.addEventListener('click', () => { goToSlide(currentSlide - 1); resetTimer(); });
+  heroNext.addEventListener('click', () => { goToSlide(currentSlide + 1); resetTimer(); });
 
-  heroNext.addEventListener('click', () => {
-    goToSlide(currentSlide + 1);
-    resetTimer();
-  });
-
-  // Keyboard support for arrow buttons
   document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowLeft')  { goToSlide(currentSlide - 1); resetTimer(); }
     if (e.key === 'ArrowRight') { goToSlide(currentSlide + 1); resetTimer(); }
   });
 
-  // Auto-advance — pause on hover
-  startTimer();
   heroEl.addEventListener('mouseenter', stopTimer);
   heroEl.addEventListener('mouseleave', startTimer);
 }
 
 function startTimer() {
+  if (totalSlides < 2) return;
   autoAdvance = setInterval(() => goToSlide(currentSlide + 1), ADVANCE_MS);
 }
 
@@ -239,51 +258,54 @@ function resetTimer() {
 
 
 // ============================================================
-// 4. Recommendation Rows
+// 6. Recommendation Rows
 // ============================================================
 
 function buildMovieCard(movie) {
+  const li      = document.createElement('li');
   const article = document.createElement('article');
   article.className = 'movie-card';
   article.setAttribute('aria-label', movie.title);
 
   const genreText = (movie.genres || []).slice(0, 2).join(', ');
+  const ratingText = (movie.rating || 0).toFixed(1);
 
   article.innerHTML = `
-    ${
-      movie.posterUrl
-        ? `<img
-             class="movie-card__poster"
-             src="${movie.posterUrl}"
-             alt="Poster for ${movie.title}"
-             loading="lazy"
-           />`
-        : `<div class="movie-card__poster-placeholder" aria-hidden="true">🎬</div>`
-    }
+    <img
+      class="movie-card__poster"
+      src="${movie.posterUrl}"
+      alt="Poster for ${movie.title}"
+      loading="lazy"
+    />
     <div class="movie-card__info">
       <p class="movie-card__title">${movie.title}</p>
       <p class="movie-card__meta">
-        <span>${movie.year}</span>
-        <span class="movie-card__rating">&#9733; ${(movie.rating || 0).toFixed(1)}</span>
+        ${movie.year ? `<span>${movie.year}</span>` : ''}
+        <span class="movie-card__rating">&#9733; ${ratingText}</span>
       </p>
     </div>
     <div class="movie-card__overlay" aria-hidden="true">
       <p class="movie-card__overlay-title">${movie.title}</p>
-      <p class="movie-card__overlay-rating">&#9733; ${(movie.rating || 0).toFixed(1)}</p>
+      <p class="movie-card__overlay-rating">&#9733; ${ratingText}</p>
       ${genreText ? `<p class="movie-card__overlay-genres">${genreText}</p>` : ''}
-      <button class="movie-card__overlay-btn movie-card__overlay-btn--primary" type="button">
-        Take Over
-      </button>
-      <button class="movie-card__overlay-btn movie-card__overlay-btn--secondary" type="button">
-        Details
-      </button>
+      <button class="movie-card__overlay-btn movie-card__overlay-btn--primary"   type="button" data-movie-id="${movie.id}">Take Over</button>
+      <button class="movie-card__overlay-btn movie-card__overlay-btn--secondary" type="button" data-movie-id="${movie.id}">Details</button>
     </div>
   `;
 
-  return article;
+  // If the image still fails to load (network error, wrong path, etc.)
+  // hide the whole card so no empty slots appear in the row.
+  const img = article.querySelector('img');
+  img.addEventListener('error', () => { li.remove(); });
+
+  li.appendChild(article);
+  return li;
 }
 
 function buildMovieRow(rowData) {
+  // Skip rows that ended up empty after poster filtering
+  if (!rowData.movies || rowData.movies.length === 0) return null;
+
   const section = document.createElement('div');
   section.className = 'movie-row';
 
@@ -299,9 +321,7 @@ function buildMovieRow(rowData) {
   list.setAttribute('aria-label', rowData.title);
 
   rowData.movies.forEach((movie) => {
-    const li = document.createElement('li');
-    li.appendChild(buildMovieCard(movie));
-    list.appendChild(li);
+    list.appendChild(buildMovieCard(movie));
   });
 
   section.appendChild(headingRow);
@@ -309,69 +329,121 @@ function buildMovieRow(rowData) {
   return section;
 }
 
-function initRecommendationRows() {
+function populateRecommendationRows(rows) {
   const container = document.getElementById('recommendationContainer');
-  RECOMMENDATION_ROWS.forEach((row) => {
-    container.appendChild(buildMovieRow(row));
+  container.innerHTML = '';
+
+  rows.forEach((row) => {
+    const el = buildMovieRow(row);
+    if (el) container.appendChild(el);
   });
 }
 
 
 // ============================================================
-// 5. Footer year
+// 7. Loading state helpers
+// ============================================================
+
+function showHeroLoading() {
+  heroTrack.innerHTML = `
+    <div class="hero-slide hero-slide--loading" aria-hidden="true">
+      <div class="hero-slide__overlay-bottom"></div>
+      <div class="hero-slide__content">
+        <div class="skeleton skeleton--title"></div>
+        <div class="skeleton skeleton--meta"></div>
+        <div class="skeleton skeleton--desc"></div>
+      </div>
+    </div>
+  `;
+  totalSlides = 1;
+}
+
+function showRowsLoading() {
+  const container = document.getElementById('recommendationContainer');
+  container.innerHTML = `
+    <div class="movie-row">
+      <div class="movie-row__heading-row">
+        <div class="skeleton skeleton--heading"></div>
+      </div>
+      <ul class="movie-row__list">
+        ${Array.from({ length: 5 }, () =>
+          `<li><div class="movie-card skeleton skeleton--card"></div></li>`
+        ).join('')}
+      </ul>
+    </div>
+  `.repeat(3);
+}
+
+
+// ============================================================
+// 8. Footer year
 // ============================================================
 
 function initFooterYear() {
   const yearEl = document.getElementById('footerYear');
-  if (yearEl) {
-    yearEl.textContent = new Date().getFullYear();
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
+}
+
+
+// ============================================================
+// 9. Load page data from TMDB
+// ============================================================
+
+async function loadPageData() {
+  showHeroLoading();
+  showRowsLoading();
+
+  try {
+    const [heroMovies, rows] = await Promise.all([
+      fetchHeroMovies(),
+      fetchAllRows(),
+    ]);
+
+    populateHeroCarousel(heroMovies);
+    startTimer();
+
+    populateRecommendationRows(rows);
+  } catch (err) {
+    console.error('Failed to load TMDB data:', err.message);
+
+    // Show a friendly message instead of a broken page
+    const container = document.getElementById('recommendationContainer');
+    container.innerHTML = `
+      <p style="padding:32px; color:var(--color-muted); font-size:14px;">
+        Could not load movies. Check that your TMDB token is valid and try refreshing.
+      </p>
+    `;
   }
 }
 
 
 // ============================================================
-// 5. TMDB API Key Modal
+// 10. TMDB API Key Modal
 // ============================================================
-
-const STORAGE_KEY = 'TMDB_ACCESS_TOKEN';
-
-export function getTmdbToken() {
-  return localStorage.getItem(STORAGE_KEY) || '';
-}
 
 function initApiKeyModal() {
-  const backdrop  = document.getElementById('apiModalBackdrop');
-  const form      = document.getElementById('apiModalForm');
-  const input     = document.getElementById('apiTokenInput');
-  const toggle    = document.getElementById('apiTokenToggle');
-  const errorMsg  = document.getElementById('apiModalError');
-  const skipBtn   = document.getElementById('apiModalSkip');
+  const backdrop = document.getElementById('apiModalBackdrop');
+  const form     = document.getElementById('apiModalForm');
+  const input    = document.getElementById('apiTokenInput');
+  const toggle   = document.getElementById('apiTokenToggle');
+  const errorMsg = document.getElementById('apiModalError');
+  const skipBtn  = document.getElementById('apiModalSkip');
 
   const existingToken = getTmdbToken();
+  if (existingToken) skipBtn.hidden = false;
 
-  // Show "continue with saved token" skip option if token exists
-  if (existingToken) {
-    skipBtn.hidden = false;
-  }
-
-  // Show/hide password toggle
   toggle.addEventListener('click', () => {
     const isPassword = input.type === 'password';
     input.type = isPassword ? 'text' : 'password';
     toggle.setAttribute('aria-label', isPassword ? 'Hide token' : 'Show token');
-    // Swap icon stroke opacity as a visual cue
-    toggle.style.color = isPassword
-      ? 'var(--color-green)'
-      : 'var(--color-muted)';
+    toggle.style.color = isPassword ? 'var(--color-green)' : 'var(--color-muted)';
   });
 
-  // Clear error styling when user types
   input.addEventListener('input', () => {
     input.classList.remove('api-modal__input--error');
     errorMsg.hidden = true;
   });
 
-  // Submit
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const token = input.value.trim();
@@ -385,49 +457,51 @@ function initApiKeyModal() {
 
     localStorage.setItem(STORAGE_KEY, token);
     dismissModal();
+    // Reload data with the newly entered token
+    loadPageData();
   });
 
-  // Skip (reuse saved token)
   skipBtn.addEventListener('click', dismissModal);
 
-  // Close on backdrop click only if a token already exists
   backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop && getTmdbToken()) {
-      dismissModal();
-    }
+    if (e.target === backdrop && getTmdbToken()) dismissModal();
   });
 
-  // Close on Escape only if a token already exists
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && getTmdbToken()) {
-      dismissModal();
-    }
+    if (e.key === 'Escape' && getTmdbToken()) dismissModal();
   });
 
   function dismissModal() {
     backdrop.classList.add('api-modal-backdrop--hidden');
-    // Return focus to main content after transition
     setTimeout(() => {
       backdrop.setAttribute('aria-hidden', 'true');
       backdrop.style.display = 'none';
     }, 320);
   }
 
-  // If no token, focus the input straight away
   if (!existingToken) {
-    // Small delay so animation plays first
     setTimeout(() => input.focus(), 350);
   }
 }
 
 
 // ============================================================
-// 6. Bootstrap
+// 11. Bootstrap
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-  initApiKeyModal();
-  initHeroCarousel();
-  initRecommendationRows();
   initFooterYear();
+  initHeroCarousel();
+
+  const token = getTmdbToken();
+  initApiKeyModal();
+
+  // If a token is already stored, load data immediately without
+  // waiting for the modal to be dismissed.
+  if (token) {
+    loadPageData();
+  }
 });
+
+
+
