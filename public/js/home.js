@@ -406,13 +406,20 @@ async function loadPageData() {
   } catch (err) {
     console.error('Failed to load TMDB data:', err.message);
 
-    // Show a friendly message instead of a broken page
     const container = document.getElementById('recommendationContainer');
     container.innerHTML = `
-      <p style="padding:32px; color:var(--color-muted); font-size:14px;">
-        Could not load movies. Check that your TMDB token is valid and try refreshing.
+      <p style="padding:32px 32px 16px; color:var(--color-muted); font-size:14px;">
+        Could not load movies. Check that your TMDB token is valid and try again.
       </p>
+      <div style="padding:0 32px 32px;">
+        <button
+          id="retryTokenBtn"
+          style="background:var(--color-green);color:#111411;border:none;padding:10px 22px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;"
+        >Update Token</button>
+      </div>
     `;
+
+    document.getElementById('retryTokenBtn')?.addEventListener('click', () => showModal());
   }
 }
 
@@ -420,6 +427,22 @@ async function loadPageData() {
 // ============================================================
 // 10. TMDB API Key Modal
 // ============================================================
+
+// showModal() can be called from anywhere to re-open the token modal.
+function showModal() {
+  const backdrop = document.getElementById('apiModalBackdrop');
+  const skipBtn  = document.getElementById('apiModalSkip');
+
+  skipBtn.hidden = !getTmdbToken();
+  backdrop.removeAttribute('aria-hidden');
+  backdrop.style.display = '';
+  backdrop.classList.remove('api-modal-backdrop--hidden');
+
+  setTimeout(() => {
+    const input = document.getElementById('apiTokenInput');
+    if (input) input.focus();
+  }, 100);
+}
 
 function initApiKeyModal() {
   const backdrop = document.getElementById('apiModalBackdrop');
@@ -496,8 +519,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const token = getTmdbToken();
   initApiKeyModal();
 
-  // If a token is already stored, load data immediately without
-  // waiting for the modal to be dismissed.
+  // Header "Update Token" button
+  document.getElementById('updateTokenBtn')?.addEventListener('click', () => showModal());
+
+  // If a token is already stored, load data immediately.
   if (token) {
     loadPageData();
   }
