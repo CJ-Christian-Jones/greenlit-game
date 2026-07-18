@@ -711,7 +711,246 @@ button {
 
 
 /* ------------------------------------------------------------
-   9. Footer
+   9. TMDB API Modal
+------------------------------------------------------------ */
+
+/* Backdrop — covers the whole viewport */
+.api-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: rgba(10, 12, 10, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  /* Hidden by default; JS removes this class to show */
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.api-modal-backdrop.api-modal-backdrop--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Card */
+.api-modal {
+  width: min(480px, 100%);
+  background-color: var(--color-panel);
+  border: 1px solid rgba(155, 229, 100, 0.15);
+  border-radius: 16px;
+  padding: 40px 36px 36px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  animation: modalSlideIn 320ms cubic-bezier(0.34, 1.36, 0.64, 1) both;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translateY(24px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Logo badge */
+.api-modal__logo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--color-green);
+  background-color: rgba(155, 229, 100, 0.10);
+  border: 1px solid rgba(155, 229, 100, 0.25);
+  border-radius: 999px;
+  padding: 4px 14px;
+  align-self: flex-start;
+  margin-bottom: 24px;
+}
+
+/* Heading */
+.api-modal__title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-cream);
+  line-height: 1.15;
+  margin-bottom: 12px;
+}
+
+/* Description */
+.api-modal__desc {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-muted);
+  margin-bottom: 14px;
+}
+
+.api-modal__desc strong {
+  color: var(--color-cream);
+  font-weight: 600;
+}
+
+/* Help link */
+.api-modal__help-link {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-green);
+  margin-bottom: 28px;
+  transition: color var(--transition-fast);
+}
+
+.api-modal__help-link:hover {
+  color: var(--color-accent);
+}
+
+/* Form */
+.api-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.api-modal__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 8px;
+}
+
+/* Input row (input + eye toggle) */
+.api-modal__input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.api-modal__input {
+  width: 100%;
+  height: 52px;
+  padding: 0 52px 0 16px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(242, 232, 213, 0.14);
+  background-color: var(--color-card);
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-cream);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.api-modal__input::placeholder {
+  color: rgba(165, 170, 159, 0.50);
+  font-size: 13px;
+}
+
+.api-modal__input:focus {
+  border-color: var(--color-green);
+  box-shadow: 0 0 0 3px rgba(155, 229, 100, 0.15);
+}
+
+.api-modal__input--error {
+  border-color: #e55e5e;
+  box-shadow: 0 0 0 3px rgba(229, 94, 94, 0.14);
+}
+
+/* Show/hide toggle */
+.api-modal__toggle-visibility {
+  position: absolute;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
+  border-radius: 4px;
+  transition: color var(--transition-fast);
+}
+
+.api-modal__toggle-visibility:hover {
+  color: var(--color-cream);
+}
+
+.api-modal__eye-icon {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+/* Inline error message */
+.api-modal__error {
+  font-size: 13px;
+  color: #e55e5e;
+  margin-bottom: 6px;
+}
+
+/* Submit button */
+.api-modal__submit {
+  width: 100%;
+  height: 52px;
+  margin-top: 10px;
+  border-radius: 8px;
+  background-color: var(--color-green);
+  color: var(--color-bg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.api-modal__submit:hover {
+  background-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.api-modal__submit:active {
+  transform: translateY(0);
+}
+
+/* Skip link */
+.api-modal__skip {
+  margin-top: 16px;
+  align-self: center;
+  font-size: 13px;
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition-fast);
+}
+
+.api-modal__skip:hover {
+  color: var(--color-cream);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .api-modal {
+    padding: 28px 20px 24px;
+    border-radius: 12px;
+  }
+
+  .api-modal__title {
+    font-size: 23px;
+  }
+}
+
+
+/* ------------------------------------------------------------
+   10. Footer
 ------------------------------------------------------------ */
 .site-footer {
   padding: 32px;
@@ -736,7 +975,7 @@ button {
 
 
 /* ------------------------------------------------------------
-   10. Responsive
+   11. Responsive
 ------------------------------------------------------------ */
 
 /* Tablet (601px – 1024px) */

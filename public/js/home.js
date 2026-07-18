@@ -43,7 +43,7 @@ const HERO_MOVIES = [
     rating: 8.4,
     genres: ['Adventure', 'Drama', 'Science Fiction'],
     overview:
-      'A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.',
+      'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
     backdropUrl: 'https://image.tmdb.org/t/p/w1280/xJHokMbljvjADYdit5fK5VQsXEG.jpg',
     posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
   },
@@ -330,10 +330,103 @@ function initFooterYear() {
 
 
 // ============================================================
+// 5. TMDB API Key Modal
+// ============================================================
+
+const STORAGE_KEY = 'TMDB_ACCESS_TOKEN';
+
+export function getTmdbToken() {
+  return localStorage.getItem(STORAGE_KEY) || '';
+}
+
+function initApiKeyModal() {
+  const backdrop  = document.getElementById('apiModalBackdrop');
+  const form      = document.getElementById('apiModalForm');
+  const input     = document.getElementById('apiTokenInput');
+  const toggle    = document.getElementById('apiTokenToggle');
+  const errorMsg  = document.getElementById('apiModalError');
+  const skipBtn   = document.getElementById('apiModalSkip');
+
+  const existingToken = getTmdbToken();
+
+  // Show "continue with saved token" skip option if token exists
+  if (existingToken) {
+    skipBtn.hidden = false;
+  }
+
+  // Show/hide password toggle
+  toggle.addEventListener('click', () => {
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    toggle.setAttribute('aria-label', isPassword ? 'Hide token' : 'Show token');
+    // Swap icon stroke opacity as a visual cue
+    toggle.style.color = isPassword
+      ? 'var(--color-green)'
+      : 'var(--color-muted)';
+  });
+
+  // Clear error styling when user types
+  input.addEventListener('input', () => {
+    input.classList.remove('api-modal__input--error');
+    errorMsg.hidden = true;
+  });
+
+  // Submit
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const token = input.value.trim();
+
+    if (!token) {
+      input.classList.add('api-modal__input--error');
+      errorMsg.hidden = false;
+      input.focus();
+      return;
+    }
+
+    localStorage.setItem(STORAGE_KEY, token);
+    dismissModal();
+  });
+
+  // Skip (reuse saved token)
+  skipBtn.addEventListener('click', dismissModal);
+
+  // Close on backdrop click only if a token already exists
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop && getTmdbToken()) {
+      dismissModal();
+    }
+  });
+
+  // Close on Escape only if a token already exists
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && getTmdbToken()) {
+      dismissModal();
+    }
+  });
+
+  function dismissModal() {
+    backdrop.classList.add('api-modal-backdrop--hidden');
+    // Return focus to main content after transition
+    setTimeout(() => {
+      backdrop.setAttribute('aria-hidden', 'true');
+      backdrop.style.display = 'none';
+    }, 320);
+  }
+
+  // If no token, focus the input straight away
+  if (!existingToken) {
+    // Small delay so animation plays first
+    setTimeout(() => input.focus(), 350);
+  }
+}
+
+
+// ============================================================
 // 6. Bootstrap
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  initApiKeyModal();
   initHeroCarousel();
   initRecommendationRows();
   initFooterYear();

@@ -131,6 +131,87 @@
     </p>
   </footer>
 
+  <!-- ====================================================
+       TMDB API KEY MODAL
+  ===================================================== -->
+  <div
+    class="api-modal-backdrop"
+    id="apiModalBackdrop"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="apiModalTitle"
+    aria-describedby="apiModalDesc"
+  >
+    <div class="api-modal">
+
+      <div class="api-modal__logo" aria-hidden="true">GREENLIT</div>
+
+      <h2 class="api-modal__title" id="apiModalTitle">Connect to TMDB</h2>
+
+      <p class="api-modal__desc" id="apiModalDesc">
+        GreenLit uses The Movie Database to power search, discovery, and movie data.
+        Paste your <strong>TMDB Read Access Token</strong> below to get started.
+      </p>
+
+      <a
+        class="api-modal__help-link"
+        href="https://www.themoviedb.org/settings/api"
+        target="_blank"
+        rel="noopener"
+      >
+        Get your free token at themoviedb.org ↗
+      </a>
+
+      <form class="api-modal__form" id="apiModalForm" novalidate>
+        <label class="api-modal__label" for="apiTokenInput">
+          Read Access Token
+        </label>
+
+        <div class="api-modal__input-row">
+          <input
+            type="password"
+            id="apiTokenInput"
+            class="api-modal__input"
+            placeholder="eyJhbGciOiJIUzI1NiJ9…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button
+            type="button"
+            class="api-modal__toggle-visibility"
+            id="apiTokenToggle"
+            aria-label="Show token"
+          >
+            <!-- Eye icon (show) -->
+            <svg class="api-modal__eye-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+
+        <p class="api-modal__error" id="apiModalError" aria-live="polite" hidden>
+          Please paste your TMDB Read Access Token.
+        </p>
+
+        <button type="submit" class="api-modal__submit">
+          Start GreenLit
+        </button>
+      </form>
+
+      <!-- Skip link — only shown if a token was previously saved -->
+      <button
+        type="button"
+        class="api-modal__skip"
+        id="apiModalSkip"
+        hidden
+      >
+        Continue with saved token
+      </button>
+
+    </div>
+  </div>
+
   <script src="js/home.js" type="module"></script>
 </body>
 </html>
