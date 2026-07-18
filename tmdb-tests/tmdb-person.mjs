@@ -11,10 +11,10 @@
 //    $env:TMDB_ACCESS_TOKEN="PASTE_YOUR_FULL_TOKEN_HERE"
 //
 // 3. Run this file with a TMDB person ID:
-//    node .\tmdb-person.mjs 18277
+//    node .\tmdb-tests\tmdb-person.mjs 18277
 //
 // You can find a person's ID by running:
-//    node .\tmdb-credits.mjs 49047
+//    node .\tmdb-tests\tmdb-credits.mjs 49047
 //
 // The person ID shown above is just an example.
 // Use any Person ID printed by your credits file.

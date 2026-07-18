@@ -70,6 +70,6 @@ getMovie();
 //    $env:TMDB_ACCESS_TOKEN
 //
 // 6. Run this JavaScript file:
-//    node .\tmdb-test.mjs
+//    node .\tmdb-tests\tmdb-test.mjs
 //
 // 7. You should see movie information printed in the terminal.

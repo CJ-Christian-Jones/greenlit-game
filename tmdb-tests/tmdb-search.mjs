@@ -10,7 +10,7 @@
 //    $env:TMDB_ACCESS_TOKEN="PASTE_YOUR_FULL_TOKEN_HERE"
 //
 // 3. Run this file and place a movie title after the filename:
-//    node .\tmdb-search.mjs "Gravity"
+//    node .\tmdb-tests\tmdb-search.mjs "Gravity"
 
 
 // Read the private TMDB token from PowerShell.

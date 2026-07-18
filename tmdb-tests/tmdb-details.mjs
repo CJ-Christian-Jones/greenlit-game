@@ -11,7 +11,7 @@
 //    $env:TMDB_ACCESS_TOKEN="PASTE_YOUR_FULL_TOKEN_HERE"
 //
 // 3. Run this file with a TMDB movie ID:
-//    node .\tmdb-details.mjs 49047
+//    node .\tmdb-tests\tmdb-details.mjs 49047
 //
 // TMDB movie ID 49047 is Gravity.
 //

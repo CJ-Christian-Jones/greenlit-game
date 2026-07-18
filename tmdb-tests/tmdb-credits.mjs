@@ -11,12 +11,12 @@
 //    $env:TMDB_ACCESS_TOKEN="PASTE_YOUR_FULL_TOKEN_HERE"
 //
 // 3. Run this file with a TMDB movie ID:
-//    node .\tmdb-credits.mjs 49047
+//    node .\tmdb-tests\tmdb-credits.mjs 49047
 //
 // TMDB movie ID 49047 is Gravity.
 //
 // You can find movie IDs by running:
-//    node .\tmdb-search.mjs "Gravity"
+//    node .\tmdb-tests\tmdb-search.mjs "Gravity"
 
 
 // Read the private TMDB token from PowerShell.
