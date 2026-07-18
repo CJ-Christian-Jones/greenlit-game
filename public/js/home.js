@@ -29,6 +29,31 @@ const ROW_MOVIE_COUNT  = 10;
 const HERO_SLIDE_COUNT = 5;
 
 
+// TMDB genre IDs used by search and discover results.
+// Full movie-detail responses include genre names directly, but
+// search results usually provide only genre_ids.
+const GENRE_NAMES = {
+  28: "Action",
+  12: "Adventure",
+  16: "Animation",
+  35: "Comedy",
+  80: "Crime",
+  99: "Documentary",
+  18: "Drama",
+  10751: "Family",
+  14: "Fantasy",
+  36: "History",
+  27: "Horror",
+  10402: "Music",
+  9648: "Mystery",
+  10749: "Romance",
+  878: "Science Fiction",
+  53: "Thriller",
+  10752: "War",
+  37: "Western",
+};
+
+
 // ============================================================
 // 2. Token helpers
 // ============================================================
@@ -83,7 +108,11 @@ function normalizeMovie(raw) {
     year:       raw.release_date ? Number(raw.release_date.slice(0, 4)) : null,
     runtime:    raw.runtime || null,
     rating:     raw.vote_average ?? 0,
-    genres:     (raw.genres || []).map((g) => g.name),
+    genres: raw.genres
+      ? raw.genres.map((genre) => genre.name)
+      : (raw.genre_ids || [])
+          .map((genreId) => GENRE_NAMES[genreId])
+          .filter(Boolean),
     overview:   raw.overview || '',
     posterUrl:  buildImageUrl(raw.poster_path, POSTER_SIZE),
     backdropUrl: buildImageUrl(raw.backdrop_path, BACKDROP_SIZE),
@@ -146,6 +175,97 @@ async function fetchAllRows() {
     { title: 'Classics',          movies: classics    },
     { title: 'Popular Right Now', movies: topRated    },
   ].filter((row) => row.movies.length > 0);
+}
+
+// ============================================================
+// Movie search and random generation
+// ============================================================
+
+/**
+ * Search TMDB using a movie title.
+ *
+ * Returns GreenLit's normalized movie objects so the existing
+ * movie-card function can display them.
+ */
+async function searchMoviesByTitle(title) {
+  const data = await tmdbFetch("/search/movie", {
+    query: title,
+    include_adult: false,
+    language: "en-US",
+    page: 1,
+  });
+
+  return (data.results || [])
+    .map(normalizeMovie)
+    .filter(Boolean)
+    .slice(0, ROW_MOVIE_COUNT);
+}
+
+
+/**
+ * Ask TMDB for a page of reasonably established movies,
+ * then choose one random movie from that page.
+ */
+async function fetchRandomMovie() {
+  const filters = {
+    include_adult: false,
+    include_video: false,
+    language: "en-US",
+    sort_by: "popularity.desc",
+
+    // Prevent the generator from choosing extremely obscure
+    // entries with almost no voting data.
+    "vote_count.gte": 200,
+  };
+
+  // Request page 1 first so we know how many pages exist.
+  const firstPage = await tmdbFetch("/discover/movie", {
+    ...filters,
+    page: 1,
+  });
+
+  // Keep the page within a safe usable range.
+  const availablePages = Math.max(
+    1,
+    Math.min(firstPage.total_pages || 1, 500)
+  );
+
+  const randomPageNumber =
+    Math.floor(Math.random() * availablePages) + 1;
+
+  // Reuse page 1 if it was randomly selected.
+  const pageData =
+    randomPageNumber === 1
+      ? firstPage
+      : await tmdbFetch("/discover/movie", {
+          ...filters,
+          page: randomPageNumber,
+        });
+
+  // Page 2 needs only the selected movie's TMDB ID.
+  const candidates = (pageData.results || []).filter(
+    (movie) => movie.id && movie.poster_path
+  );
+
+  if (candidates.length === 0) {
+    throw new Error(
+      "TMDB returned no usable movies on the selected page."
+    );
+  }
+
+  const randomIndex =
+    Math.floor(Math.random() * candidates.length);
+
+  return candidates[randomIndex];
+}
+
+
+/**
+ * Open Page 2 using the selected TMDB movie ID.
+ */
+function openDirectionPage(movieId) {
+  if (!movieId) return;
+  window.location.href = `direction.html?id=${encodeURIComponent(movieId)}`;
 }
 
 
@@ -339,6 +459,218 @@ function populateRecommendationRows(rows) {
   });
 }
 
+// ============================================================
+// Search and Generate controls
+// ============================================================
+
+/**
+ * Display a simple status message where movie rows normally appear.
+ */
+function showMovieStatus(message) {
+  const container =
+    document.getElementById("recommendationContainer");
+
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  const section = document.createElement("div");
+  section.className = "movie-row";
+
+  const headingRow = document.createElement("div");
+  headingRow.className = "movie-row__heading-row";
+
+  const heading = document.createElement("h2");
+  heading.className = "movie-row__title";
+  heading.textContent = message;
+
+  headingRow.appendChild(heading);
+  section.appendChild(headingRow);
+  container.appendChild(section);
+}
+
+
+/**
+ * Replace the normal recommendation rows with search results.
+ */
+function displaySearchResults(movies, query) {
+  const container =
+    document.getElementById("recommendationContainer");
+
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (movies.length === 0) {
+    showMovieStatus(
+      `No movies found for “${query}”.`
+    );
+
+    return;
+  }
+
+  const resultRow = buildMovieRow({
+    title: "Search Results",
+    movies,
+  });
+
+  if (!resultRow) {
+    showMovieStatus(
+      `No usable movie posters were found for “${query}”.`
+    );
+
+    return;
+  }
+
+  // Use textContent so the user's search cannot insert HTML.
+  const heading =
+    resultRow.querySelector(".movie-row__title");
+
+  if (heading) {
+    heading.textContent =
+      `Search Results for “${query}”`;
+  }
+
+  container.appendChild(resultRow);
+
+  container.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
+
+/**
+ * Run when the player submits the search form.
+ */
+async function handleMovieSearch(event) {
+  event.preventDefault();
+
+  const form =
+    document.getElementById("searchForm");
+
+  const input =
+    document.getElementById("searchInput");
+
+  const submitButton =
+    form?.querySelector('button[type="submit"]');
+
+  if (!input) return;
+
+  const query = input.value.trim();
+
+  if (!query) {
+    input.focus();
+    return;
+  }
+
+  // Search needs the browser's saved TMDB token.
+  if (!getTmdbToken()) {
+    showModal();
+    return;
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+  }
+
+  input.disabled = true;
+  showMovieStatus(`Searching for “${query}”…`);
+
+  try {
+    const movies =
+      await searchMoviesByTitle(query);
+
+    displaySearchResults(movies, query);
+  } catch (error) {
+    console.error(
+      "Movie search failed:",
+      error
+    );
+
+    showMovieStatus(
+      "Search failed. Check your TMDB token and try again."
+    );
+  } finally {
+    input.disabled = false;
+
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
+
+    input.focus();
+  }
+}
+
+
+/**
+ * Run when the player presses Generate Movie.
+ *
+ * A successful result goes directly to Page 2.
+ */
+async function handleRandomMovie() {
+  const button =
+    document.getElementById("randomMovieBtn");
+
+  if (!button) return;
+
+  if (!getTmdbToken()) {
+    showModal();
+    return;
+  }
+
+  const originalText = button.textContent;
+
+  button.disabled = true;
+  button.textContent = "🎲 Finding a movie…";
+  button.setAttribute("aria-busy", "true");
+
+  try {
+    const movie =
+      await fetchRandomMovie();
+
+    openDirectionPage(movie.id);
+  } catch (error) {
+    console.error(
+      "Random movie generation failed:",
+      error
+    );
+
+    showMovieStatus(
+      "Could not generate a movie. Please try again."
+    );
+
+    button.disabled = false;
+    button.textContent = originalText;
+    button.removeAttribute("aria-busy");
+  }
+}
+
+
+/**
+ * Connect the HTML controls to their JavaScript behavior.
+ */
+function initMovieSelectionControls() {
+  const searchForm =
+    document.getElementById("searchForm");
+
+  const randomMovieButton =
+    document.getElementById("randomMovieBtn");
+
+  if (searchForm) {
+    searchForm.addEventListener(
+      "submit",
+      handleMovieSearch
+    );
+  }
+
+  if (randomMovieButton) {
+    randomMovieButton.addEventListener(
+      "click",
+      handleRandomMovie
+    );
+  }
+}
 
 // ============================================================
 // 7. Loading state helpers
@@ -664,12 +996,18 @@ function initProfile() {
 // 13. "Take Over" button navigation
 // ============================================================
 
-document.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-movie-id]');
-  if (!btn) return;
-  if (btn.textContent.trim() !== 'Take Over') return;
-  const movieId = btn.dataset.movieId;
-  if (movieId) window.location.href = `direction.html?id=${movieId}`;
+document.addEventListener("click", (event) => {
+  const button = event.target.closest(
+    'button[data-movie-id]'
+  );
+
+  if (!button) return;
+
+  if (button.textContent.trim() !== "Take Over") {
+    return;
+  }
+
+  openDirectionPage(button.dataset.movieId);
 });
 
 
@@ -677,6 +1015,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFooterYear();
   initHeroCarousel();
   initProfile();
+  initMovieSelectionControls();
 
   const token = getTmdbToken();
   initApiKeyModal();
